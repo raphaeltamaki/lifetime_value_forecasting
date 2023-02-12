@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from VolumeAcquisition import BaseVolume
-from ProfitModel import StandardModel
+from src.VolumeAcquisition import BaseVolume
+from src.ProfitModel import StandardModel
 from typing import List
 from itertools import product
 
@@ -34,6 +34,10 @@ class StandardBidOptimizer():
 
 
     def simulate(self):
+        """
+        For each of the defined values of standard deviation of the error of the lifetime value prediction, 
+        simulate bidding different fractions of the LTV and evaluate the resulting profit obtained
+        """
 
         for sd in self.std_values:
 
@@ -46,23 +50,11 @@ class StandardBidOptimizer():
             self.results = pd.concat([self.results, df]) if self.results is not None else df
 
 
-    # def simulate(self):
-        
-    #     for sd in self.std_values:
-
-    #         estimated_ltv_sample = np.random.normal(self.reference_ltv_value, sd, self.sample_size)
-    #         observed_ltv_sample = np.random.normal(self.reference_ltv_value, 0.3, self.sample_size)
-
-    #         df = pd.DataFrame(list(product(estimated_ltv_sample, self.ltv_fractions)), columns=['estimated_ltv', 'ltv_fraction'])
-    #         observed_df = pd.DataFrame(list(product(observed_ltv_sample, self.ltv_fractions)), columns=['observed_ltv', 'ltv_fraction'])
-
-    #         df['cpi'] = df['estimated_ltv'] * df['ltv_fraction'] 
-    #         df['observed_ltv'] = observed_df['observed_ltv']
-    #         df['profit'] = df.apply(lambda x: self.profit_model.calculate_profit(x['cpi'], x['observed_ltv']), axis=1)
-    #         df['sd'] = sd
-    #         self.results = pd.concat([self.results, df]) if self.results is not None else df
-
     def calculate_bidding_strategy_results(self):
+        """
+        From the simulations obtained from the method simulate(), calculate the average profit obtained by each pair (ltv_fraction, ltv error standard deviation).
+        Then calculate for each (ltv error standard deviation) which (ltv_fraction) has the highest average profit, and what it is 
+        """
 
         def f(x):
             output = {}
@@ -77,6 +69,9 @@ class StandardBidOptimizer():
 
     
     def run(self):
+        """
+        TODO
+        """
 
         self.simulate()
         self.calculate_bidding_strategy_results()

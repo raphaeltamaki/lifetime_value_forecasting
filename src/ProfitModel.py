@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from VolumeAcquisition import BaseVolume
+from src.VolumeAcquisition import BaseVolume
 from scipy.optimize import minimize
 
 

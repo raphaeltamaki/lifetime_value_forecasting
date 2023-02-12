@@ -30,6 +30,7 @@ class CumulativeLognormalVolume(BaseVolume):
     def __init__(self, average: float, standard_deviation: float):
         self.average = average
         self.standard_deviation = standard_deviation
+        self.expected_value = np.exp(average + 0.5*standard_deviation**2)
 
     def calculate_volume(self, cpi: float):
         
