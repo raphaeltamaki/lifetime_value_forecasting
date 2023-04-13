@@ -11,12 +11,11 @@ class StandardModel():
         self.volume_model = volume_model
         self.lifetime_value = lifetime_value
         
-    def calculate_profit(self, cpi: float, ltv: float=None) -> float:
-        ltv = ltv or self.lifetime_value
-        return self.volume_model.calculate_volume(cpi) * (ltv - cpi)
+    def calculate_profit(self, cpi: float) -> float:
+        return self.volume_model.calculate_volume(cpi) * (self.lifetime_value - cpi)
     
     def _calculate_loss(self, cpi: float) -> float:
-        return -self.calculate_profit(cpi)
+        return float(-self.calculate_profit(cpi))
     
     def optimal_cpi(self, starting_value: float=1.0) -> float:
         """Find optimal bid based on the volume function using simplex"""

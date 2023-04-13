@@ -13,7 +13,9 @@ class StandardBidOptimizer():
         volume_acquisition_model: BaseVolume,
         std_values: List[float],
         ltv_fractions: List[float],
-        sample_size: int=10000
+        sample_size: int=10000,
+        reference_ltv_value: float=2,
+        random_sedd=42
         ) -> None:
         """
         volume_acquisition_model: BaseVolume variable that describes how does volume vary by cost per install?
@@ -27,30 +29,41 @@ class StandardBidOptimizer():
         self.std_values = std_values
         self.ltv_fractions = np.array(ltv_fractions)
         self.sample_size = sample_size
-        self.results = None
-        self.reference_ltv_value = 1.0
+        self.reference_ltv_value = reference_ltv_value
+
         self.profit_model = StandardModel(self.volume_acquisition_model, self.reference_ltv_value)
         self.bidding_strategy_data = None
+        self.rng = np.random.default_rng(random_sedd)
 
 
-    def simulate(self):
+    def simulate(self) -> pd.DataFrame:
         """
         For each of the defined values of standard deviation of the error of the lifetime value prediction, 
         simulate bidding different fractions of the LTV and evaluate the resulting profit obtained
         """
 
+        results = []
         for sd in self.std_values:
 
-            ltv_sample = np.random.normal(self.reference_ltv_value, sd, self.sample_size)
+            ltv_sample = self.rng.normal(self.reference_ltv_value, sd, self.sample_size)
 
             df = pd.DataFrame(list(product(ltv_sample, self.ltv_fractions)), columns=['estimated_ltv', 'ltv_fraction'])
-            df['cpi'] = df['estimated_ltv'] * df['ltv_fraction'] 
-            df['profit'] = df.apply(lambda x: self.profit_model.calculate_profit(x['cpi'], self.reference_ltv_value), axis=1)
+
+            # method to find the optimal cpi for each case
+            def f(x):
+                # create a profit model that thinks the actual LTV is what we predicted
+                predicted_profit_model = StandardModel(self.volume_acquisition_model, x['estimated_ltv'] * x['ltv_fraction'])
+                return predicted_profit_model.optimal_cpi()
+            df['cpi'] = df.apply(f, axis=1)
+
+            df['profit'] = df.apply(lambda x: self.profit_model.calculate_profit(x['cpi']), axis=1)
             df['sd'] = sd
-            self.results = pd.concat([self.results, df]) if self.results is not None else df
+            results.append(df)
+
+        return pd.concat(results)
 
 
-    def calculate_bidding_strategy_results(self):
+    def calculate_bidding_strategy_results(self, simulations_data: pd.DataFrame):
         """
         From the simulations obtained from the method simulate(), calculate the average profit obtained by each pair (ltv_fraction, ltv error standard deviation).
         Then calculate for each (ltv error standard deviation) which (ltv_fraction) has the highest average profit, and what it is 
@@ -62,10 +75,9 @@ class StandardBidOptimizer():
             output['std_profit'] = np.std(x['profit'])
             return pd.Series(output)
 
-        self.bidding_strategy_data = self.results.groupby(['sd', 'ltv_fraction']).apply(lambda x: f(x)).reset_index()
+        self.bidding_strategy_data = simulations_data.groupby(['sd', 'ltv_fraction']).apply(lambda x: f(x)).reset_index()
         self.bidding_strategy_data = self.bidding_strategy_data.sort_values('mean_profit', ascending=False)
         self.bidding_strategy_data = self.bidding_strategy_data.groupby('sd')['mean_profit', 'std_profit', 'ltv_fraction'].first().reset_index()
-        self.bidding_strategy_data['ltv_fraction'] = self.bidding_strategy_data['ltv_fraction'] /  self.profit_model.optimal_cpi(self.reference_ltv_value)
 
     
     def run(self):
@@ -73,5 +85,5 @@ class StandardBidOptimizer():
         TODO
         """
 
-        self.simulate()
-        self.calculate_bidding_strategy_results()
+        sim_results = self.simulate()
+        self.calculate_bidding_strategy_results(sim_results)
